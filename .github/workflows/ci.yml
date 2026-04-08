@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [devel, "copilot/**"]
+  pull_request:
+    branches: [devel]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Windows build (MSVC) ──────────────────────────────────────────────────
+  build-windows:
+    name: Build – Windows (MSVC)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build
+          -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Smoke-test (version)
+        run: build\bin\Release\mouse-sync.exe version
+
+      - name: Smoke-test (schema)
+        run: build\bin\Release\mouse-sync.exe schema
+
+      - name: Smoke-test (print example)
+        run: >
+          build\bin\Release\mouse-sync.exe print
+          --in examples\windows_example.json
+
+  # ── Linux build (GCC) ────────────────────────────────────────────────────
+  build-ubuntu:
+    name: Build – Ubuntu (GCC)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_COMPILER=g++
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Smoke-test (version)
+        run: build/bin/mouse-sync version
+
+      - name: Smoke-test (schema)
+        run: build/bin/mouse-sync schema
+
+      - name: Smoke-test (print example)
+        run: build/bin/mouse-sync print --in examples/windows_example.json
