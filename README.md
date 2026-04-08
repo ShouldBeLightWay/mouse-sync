@@ -48,12 +48,26 @@ When applying to Windows the tool:
 3. Broadcasts `WM_SETTINGCHANGE` so running applications pick up the changes
    immediately (no reboot needed).
 
+### Captured KDE Wayland settings
+
+For the current `kde-wayland` backend the tool captures per-device pointer
+settings exposed by KWin DBus:
+
+- device identity: `name`, `vendor`, `product`
+- pointer acceleration speed and profile
+- left-handed mode
+- middle-button emulation
+- natural scrolling
+- scroll factor
+- scroll-on-button-down
+
 ---
 
 ## JSON format
 
 See [`examples/windows_example.json`](examples/windows_example.json) for a
-real-world sample.
+Windows sample and [`examples/kde_wayland_example.json`](examples/kde_wayland_example.json)
+for a KDE Plasma / Wayland sample.
 
 Run `mouse-sync schema` for a full field-by-field description.
 
@@ -143,7 +157,9 @@ mouse-sync/
 ├── core/             Header-only profile model + JSON serialization
 │   └── include/mouse_sync/profile.hpp
 ├── backends/
-│   └── windows/      Windows SPI + registry backend (WIN32 only)
+│   ├── windows/      Windows SPI + registry backend (WIN32 only)
+│   └── linux/kde_wayland/
+│                      KDE Plasma / Wayland backend via KWin DBus
 ├── cli/              CLI entry point (main.cpp)
 ├── examples/         Sample JSON files
 └── .github/workflows CI (Windows MSVC + Ubuntu GCC)
@@ -156,7 +172,7 @@ mouse-sync/
 | Version | Goal |
 |---|---|
 | **0.1** (this PR) | Windows capture/apply, cross-platform CLI skeleton |
-| **0.2** | Linux KDE Wayland backend (`kwriteconfig6` / libinput) |
+| **0.2** | Expand KDE Wayland backend coverage and tests |
 | **0.2** | Linux X11 / Cinnamon backend (`xinput` properties) |
 | **0.3** | Calibration: measure px/cm and auto-match across OSes |
 
