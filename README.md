@@ -25,8 +25,8 @@
 1. **Captures** all relevant mouse pointer settings from the current OS and
    saves them to a JSON file.
 2. **Applies** settings from a JSON file to the current OS.
-3. Provides a shared JSON format with a `windows` section and a `linux`
-   placeholder, ready for future backends.
+3. Provides a shared JSON format with top-level metadata and a single active
+  platform payload, ready for future backends.
 
 ### Captured Windows settings
 
@@ -99,8 +99,8 @@ cmake --build build
 mouse-sync <command> [options]
 
 Commands:
-  capture   --os windows --out <file>   Capture settings from the current OS
-  apply     --os windows --in  <file>   Apply settings to the current OS
+  capture   --backend windows --out <file>   Capture settings from the current backend
+  apply     --backend windows --in  <file>   Apply settings to the current backend
   print     --in <file>                 Pretty-print a JSON profile (any OS)
   schema                                Show the JSON schema description
   version                               Show version and available backends
@@ -110,10 +110,10 @@ Commands:
 
 ```powershell
 # On Windows: save current settings
-mouse-sync capture --os windows --out my-mouse.json
+mouse-sync capture --backend windows --out my-mouse.json
 
 # On Windows: restore settings from a file
-mouse-sync apply --os windows --in my-mouse.json
+mouse-sync apply --backend windows --in my-mouse.json
 
 # On any OS: inspect a saved profile
 mouse-sync print --in my-mouse.json
@@ -150,10 +150,9 @@ mouse-sync/
 
 ## Contributing
 
-Pull requests are welcome. To add a new backend, implement a header similar to
-`backends/windows/src/windows_backend.hpp` with `capture()` and `apply()`
-functions returning/accepting the relevant section of `MouseProfile`, then wire
-it up in `cli/main.cpp`.
+Pull requests are welcome. To add a new backend, implement a backend-specific
+adapter and register it via the backend dispatch layer rather than wiring it
+directly into `cli/main.cpp`.
 
 ## License
 
