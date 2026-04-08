@@ -11,6 +11,12 @@
 namespace mouse_sync
 {
 
+struct BackendSelection
+{
+    std::string os_id;
+    std::string backend_id;
+};
+
 struct BackendError : std::runtime_error
 {
     std::string backend_id;
@@ -23,6 +29,9 @@ struct BackendError : std::runtime_error
 };
 
 std::vector<std::string> available_backends();
+std::optional<std::string> detect_current_os();
+std::optional<std::string> auto_detect_backend();
+BackendSelection resolve_backend_selection(const std::string &requested_os, const std::string &requested_backend);
 MouseProfile capture_profile(const std::string &backend_id, const std::string &created_at);
 void apply_profile(const std::string &backend_id, const MouseProfile &profile);
 
