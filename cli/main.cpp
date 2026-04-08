@@ -73,6 +73,14 @@ static std::string join_strings(const std::vector<std::string> &values)
     return ss.str();
 }
 
+static std::string join_strings_with_auto(const std::vector<std::string> &values)
+{
+    std::vector<std::string> with_auto;
+    with_auto.emplace_back("auto");
+    with_auto.insert(with_auto.end(), values.begin(), values.end());
+    return join_strings(with_auto);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // JSON schema description
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,18 +120,46 @@ static const char *kSchemaDescription = R"(mouse-sync JSON schema (version 1)
 }
 )";
 
+static int resolve_selection(const std::string &requested_os, const std::string &requested_backend,
+                             mouse_sync::BackendSelection &selection)
+{
+    try
+    {
+        selection = mouse_sync::resolve_backend_selection(requested_os, requested_backend);
+        return 0;
+    }
+    catch (const mouse_sync::BackendError &ex)
+    {
+        std::cerr << "Backend resolution error [" << ex.backend_id << "]: " << ex.what() << "\n";
+        return 1;
+    }
+    catch (const std::exception &ex)
+    {
+        std::cerr << "Error: " << ex.what() << "\n";
+        return 1;
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Command implementations
 // ─────────────────────────────────────────────────────────────────────────────
 
-static int cmd_capture(const std::string &backend_id, const std::string &out_path)
+static int cmd_capture(const std::string &requested_os, const std::string &requested_backend,
+                       const std::string &out_path)
 {
+    mouse_sync::BackendSelection selection;
+    if (resolve_selection(requested_os, requested_backend, selection) != 0)
+    {
+        return 1;
+    }
+
     try
     {
-        auto profile = mouse_sync::capture_profile(backend_id, current_utc_iso8601());
+        auto profile = mouse_sync::capture_profile(selection.backend_id, current_utc_iso8601());
         std::string json = mouse_sync::profile_to_json_string(profile);
         write_file(out_path, json);
-        std::cout << "Captured backend '" << backend_id << "' settings -> " << out_path << "\n";
+        std::cout << "Captured backend '" << selection.backend_id << "' for OS '" << selection.os_id << "' -> "
+                  << out_path << "\n";
         return 0;
     }
     catch (const mouse_sync::BackendError &ex)
@@ -143,14 +179,21 @@ static int cmd_capture(const std::string &backend_id, const std::string &out_pat
     }
 }
 
-static int cmd_apply(const std::string &backend_id, const std::string &in_path)
+static int cmd_apply(const std::string &requested_os, const std::string &requested_backend, const std::string &in_path)
 {
+    mouse_sync::BackendSelection selection;
+    if (resolve_selection(requested_os, requested_backend, selection) != 0)
+    {
+        return 1;
+    }
+
     try
     {
         std::string json = read_file(in_path);
         auto profile = mouse_sync::profile_from_json_string(json);
-        mouse_sync::apply_profile(backend_id, profile);
-        std::cout << "Applied backend '" << backend_id << "' settings from " << in_path << "\n";
+        mouse_sync::apply_profile(selection.backend_id, profile);
+        std::cout << "Applied backend '" << selection.backend_id << "' for OS '" << selection.os_id << "' from "
+                  << in_path << "\n";
         return 0;
     }
     catch (const mouse_sync::BackendError &ex)
@@ -197,26 +240,34 @@ int main(int argc, char **argv)
     CLI::App app{"mouse-sync: synchronize mouse pointer settings between OSes"};
     app.set_version_flag("--version,-V", std::string("mouse-sync ") + MOUSE_SYNC_VERSION);
 
-    const auto backend_help = std::string("Target backend (") + join_strings(mouse_sync::available_backends()) + ")";
+    const auto os_help = std::string("Target OS (") + join_strings_with_auto({"windows", "linux"}) + "; default: auto)";
+    const auto backend_help =
+        std::string("Target backend (") + join_strings_with_auto(mouse_sync::available_backends()) + "; default: auto)";
 
     // ── capture ───────────────────────────────────────────────────────────────
     {
         auto *sub = app.add_subcommand("capture", "Capture mouse settings from the current OS");
+        std::string os_val{"auto"};
         std::string backend_val;
         std::string out_val;
-        sub->add_option("--backend,--os", backend_val, backend_help)->required();
+        backend_val = "auto";
+        sub->add_option("--os", os_val, os_help);
+        sub->add_option("--backend", backend_val, backend_help);
         sub->add_option("--out", out_val, "Output JSON file path")->required();
-        sub->callback([&backend_val, &out_val]() { std::exit(cmd_capture(backend_val, out_val)); });
+        sub->callback([&os_val, &backend_val, &out_val]() { std::exit(cmd_capture(os_val, backend_val, out_val)); });
     }
 
     // ── apply ─────────────────────────────────────────────────────────────────
     {
         auto *sub = app.add_subcommand("apply", "Apply mouse settings from a JSON file");
+        std::string os_val{"auto"};
         std::string backend_val;
         std::string in_val;
-        sub->add_option("--backend,--os", backend_val, backend_help)->required();
+        backend_val = "auto";
+        sub->add_option("--os", os_val, os_help);
+        sub->add_option("--backend", backend_val, backend_help);
         sub->add_option("--in", in_val, "Input JSON file path")->required();
-        sub->callback([&backend_val, &in_val]() { std::exit(cmd_apply(backend_val, in_val)); });
+        sub->callback([&os_val, &backend_val, &in_val]() { std::exit(cmd_apply(os_val, backend_val, in_val)); });
     }
 
     // ── print ─────────────────────────────────────────────────────────────────
