@@ -9,7 +9,6 @@
 #include <winreg.h>
 // clang-format on
 
-#include <array>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -23,6 +22,19 @@ namespace mouse_sync::windows {
 
 namespace {
 
+/// Convert a null-terminated wide string to a UTF-8 std::string.
+std::string wchar_to_utf8(const WCHAR* wstr)
+{
+    if (!wstr || *wstr == L'\0') return {};
+    int needed = WideCharToMultiByte(CP_UTF8, 0, wstr, -1,
+                                     nullptr, 0, nullptr, nullptr);
+    if (needed <= 0) return {};
+    std::string result(static_cast<size_t>(needed - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wstr, -1,
+                        result.data(), needed, nullptr, nullptr);
+    return result;
+}
+
 /// Format a Windows error code as a human-readable string.
 std::string format_win_error(DWORD code)
 {
@@ -35,22 +47,14 @@ std::string format_win_error(DWORD code)
 
     std::string result;
     if (len > 0 && buf) {
-        // Convert wide string to narrow UTF-8 (ASCII subset is fine for error
-        // messages on any locale, and is safe without ICU).
-        int needed = WideCharToMultiByte(CP_UTF8, 0, buf, static_cast<int>(len),
-                                         nullptr, 0, nullptr, nullptr);
-        if (needed > 0) {
-            result.resize(static_cast<size_t>(needed));
-            WideCharToMultiByte(CP_UTF8, 0, buf, static_cast<int>(len),
-                                result.data(), needed, nullptr, nullptr);
-            // Trim trailing whitespace / CRLF added by FormatMessage.
-            while (!result.empty() &&
-                   (result.back() == '\n' || result.back() == '\r' ||
-                    result.back() == ' ')) {
-                result.pop_back();
-            }
-        }
+        result = wchar_to_utf8(buf);
         LocalFree(buf);
+        // Trim trailing whitespace / CRLF added by FormatMessage.
+        while (!result.empty() &&
+               (result.back() == '\n' || result.back() == '\r' ||
+                result.back() == ' ')) {
+            result.pop_back();
+        }
     }
     if (result.empty()) {
         result = "error " + std::to_string(code);
@@ -119,7 +123,7 @@ std::optional<std::string> reg_read_sz(HKEY hKey, const WCHAR* name)
     if (st != ERROR_SUCCESS) {
         throw_win_error(
             "RegQueryValueExW (size probe) for " +
-                std::string(name, name + wcslen(name)),
+                wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
     if (type != REG_SZ) {
@@ -131,7 +135,7 @@ std::optional<std::string> reg_read_sz(HKEY hKey, const WCHAR* name)
                           reinterpret_cast<LPBYTE>(buf.data()), &bytes);
     if (st != ERROR_SUCCESS) {
         throw_win_error(
-            "RegQueryValueExW for " + std::string(name, name + wcslen(name)),
+            "RegQueryValueExW for " + wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
 
@@ -159,7 +163,7 @@ std::optional<std::string> reg_read_binary_hex(HKEY hKey, const WCHAR* name)
     if (st != ERROR_SUCCESS) {
         throw_win_error(
             "RegQueryValueExW (size probe) for " +
-                std::string(name, name + wcslen(name)),
+                wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
     if (type != REG_BINARY) {
@@ -170,7 +174,7 @@ std::optional<std::string> reg_read_binary_hex(HKEY hKey, const WCHAR* name)
     st = RegQueryValueExW(hKey, name, nullptr, &type, buf.data(), &bytes);
     if (st != ERROR_SUCCESS) {
         throw_win_error(
-            "RegQueryValueExW for " + std::string(name, name + wcslen(name)),
+            "RegQueryValueExW for " + wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
     return bytes_to_hex(buf);
@@ -189,7 +193,7 @@ std::optional<int> reg_read_dword(HKEY hKey, const WCHAR* name)
     }
     if (st != ERROR_SUCCESS) {
         throw_win_error(
-            "RegQueryValueExW for " + std::string(name, name + wcslen(name)),
+            "RegQueryValueExW for " + wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
     return static_cast<int>(value);
@@ -210,7 +214,7 @@ void reg_write_sz(HKEY hKey, const WCHAR* name, const std::string& value)
                                   bytes);
     if (st != ERROR_SUCCESS) {
         throw_win_error(
-            "RegSetValueExW for " + std::string(name, name + wcslen(name)),
+            "RegSetValueExW for " + wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
 }
@@ -225,7 +229,7 @@ void reg_write_binary_hex(HKEY hKey, const WCHAR* name,
                                 static_cast<DWORD>(data.size()));
     if (st != ERROR_SUCCESS) {
         throw_win_error(
-            "RegSetValueExW for " + std::string(name, name + wcslen(name)),
+            "RegSetValueExW for " + wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
 }
@@ -239,7 +243,7 @@ void reg_write_dword(HKEY hKey, const WCHAR* name, int value)
                                 sizeof(dw));
     if (st != ERROR_SUCCESS) {
         throw_win_error(
-            "RegSetValueExW for " + std::string(name, name + wcslen(name)),
+            "RegSetValueExW for " + wchar_to_utf8(name),
             static_cast<DWORD>(st));
     }
 }
