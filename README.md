@@ -99,8 +99,10 @@ cmake --build build
 mouse-sync <command> [options]
 
 Commands:
-  capture   --backend windows --out <file>   Capture settings from the current backend
-  apply     --backend windows --in  <file>   Apply settings to the current backend
+  capture   [--os auto] [--backend auto] --out <file>
+                                          Capture settings from the current backend
+  apply     [--os auto] [--backend auto] --in <file>
+                                          Apply settings to the current backend
   print     --in <file>                 Pretty-print a JSON profile (any OS)
   schema                                Show the JSON schema description
   version                               Show version and available backends
@@ -110,14 +112,21 @@ Commands:
 
 ```powershell
 # On Windows: save current settings
-mouse-sync capture --backend windows --out my-mouse.json
+mouse-sync capture --out my-mouse.json
 
 # On Windows: restore settings from a file
-mouse-sync apply --backend windows --in my-mouse.json
+mouse-sync apply --in my-mouse.json
+
+# Explicit form still works
+mouse-sync capture --os windows --backend windows --out my-mouse.json
 
 # On any OS: inspect a saved profile
 mouse-sync print --in my-mouse.json
 ```
+
+If `--os` or `--backend` are omitted, the CLI treats them as `auto`. If the
+current environment cannot be determined unambiguously, the command exits with
+an explicit error and asks for a concrete value.
 
 ---
 
