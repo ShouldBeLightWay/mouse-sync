@@ -1,0 +1,26 @@
+{
+    "mouse_sync_version": "0.1",
+    "schema_version": 1,
+    "created_at": "2026-04-08T15:13:26Z",
+    "source_os": "linux",
+    "source_backend": "kde-wayland",
+    "linux": {
+        "accel_speed": 0.0,
+        "accel_profile": "adaptive",
+        "backend": "kde-wayland",
+        "pointer_devices": [
+            {
+                "name": "Logitech USB Receiver Mouse",
+                "vendor": 1133,
+                "product": 50504,
+                "left_handed": false,
+                "middle_emulation": false,
+                "accel_speed": 0.0,
+                "accel_profile": "adaptive",
+                "natural_scroll": false,
+                "scroll_factor": 0.5,
+                "scroll_on_button_down": false
+            }
+        ]
+    }
+}
