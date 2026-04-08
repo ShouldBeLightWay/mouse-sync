@@ -112,10 +112,24 @@ static const char *kSchemaDescription = R"(mouse-sync JSON schema (version 1)
     }
   }
 
-    "linux": {                     // present only for Linux profiles
-    "accel_speed":   number | null   // libinput accel speed: -1.0 .. 1.0
-    "accel_profile": string | null   // "adaptive" | "flat" | "custom"
-    "backend":       string | null   // e.g. "kde-wayland", "gnome", "x11"
+    "linux": {                      // present only for Linux profiles
+        "accel_speed":   number | null   // summary of the first captured mouse device, if available
+        "accel_profile": string | null   // summary of the first captured mouse device, if available
+        "backend":       string | null   // e.g. "kde-wayland", "x11-cinnamon"
+        "pointer_devices": [
+            {
+                "name":                   string
+                "vendor":                 integer
+                "product":                integer
+                "left_handed":            boolean | null
+                "middle_emulation":       boolean | null
+                "accel_speed":            number  | null   // -1.0 .. 1.0
+                "accel_profile":          string  | null   // "adaptive" | "flat"
+                "natural_scroll":         boolean | null
+                "scroll_factor":          number  | null
+                "scroll_on_button_down":  boolean | null
+            }
+        ]
   }
 }
 )";
