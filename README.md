@@ -11,7 +11,7 @@
 | Windows apply (SPI + registry + broadcast) | ✅ Implemented |
 | `print` command (cross-platform, reads JSON) | ✅ Implemented |
 | `schema` / `version` commands | ✅ Implemented |
-| Linux KDE/Wayland backend | 🔜 Planned (v0.2) |
+| Linux KDE/Wayland backend | ✅ Basic capture/apply via KWin DBus |
 | Linux X11/Cinnamon backend | 🔜 Planned (v0.2) |
 | Calibration / auto-match | 🔜 Planned (v0.3) |
 | GUI | ❌ Non-goal for now |
@@ -80,10 +80,12 @@ cmake --build build --config Release
 
 Or open the folder in Visual Studio 2022 and use the built-in CMake support.
 
-### Linux (GCC / Ninja) — core + CLI only
+### Linux (GCC / Ninja)
 
-The Linux backend is not implemented yet; the build still succeeds and the
-`print`, `schema`, and `version` commands work cross-platform.
+On KDE Plasma / Wayland, the build includes a basic `kde-wayland` backend that
+captures and applies pointer settings through KWin's input-device DBus API.
+On other Linux desktops the build still succeeds, but backend auto-detection may
+return no supported backend for the current session.
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -119,6 +121,9 @@ mouse-sync apply --in my-mouse.json
 
 # Explicit form still works
 mouse-sync capture --os windows --backend windows --out my-mouse.json
+
+# On KDE Plasma / Wayland: capture the current KWin mouse profile
+mouse-sync capture --backend kde-wayland --out plasma-mouse.json
 
 # On any OS: inspect a saved profile
 mouse-sync print --in my-mouse.json

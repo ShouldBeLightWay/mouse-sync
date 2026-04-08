@@ -9,7 +9,7 @@
 - применить профиль обратно в ту же или другую поддерживаемую среду;
 - оставить место для будущего маппинга между разными backend'ами.
 
-Сейчас проект находится на стадии рабочего skeleton-а: Windows backend уже реализован и проверен вручную, Linux backend'ы пока не реализованы.
+Сейчас проект находится на стадии рабочего skeleton-а: Windows backend уже реализован и проверен вручную, а для Linux появился базовый backend `kde-wayland`, работающий через KWin DBus. При этом полноценный Linux backend layer и второй backend пока отсутствуют.
 
 ## Текущая структура
 
@@ -104,6 +104,29 @@ Backend отвечает за две операции:
 - `SystemParametersInfoW` для speed и acceleration settings;
 - `HKCU\Control Panel\Mouse` для registry snapshot;
 - `WM_SETTINGCHANGE` для broadcast изменений.
+
+Текущий `kde-wayland` backend использует:
+
+- KWin DBus `InputDeviceManager.ListPointers` для discovery pointer devices;
+- `org.freedesktop.DBus.Properties.GetAll` для capture device properties;
+- `org.freedesktop.DBus.Properties.Set` для apply device properties.
+
+### Текущее состояние `kde-wayland`
+
+Первый Linux backend реализован в минимально рабочем виде и намеренно опирается на уже существующий KWin runtime API вместо прямого редактирования `kcminputrc`.
+
+Сейчас он:
+
+- определяет pointer devices через KWin;
+- исключает touchpad и keyboard-like pointer devices из mouse profile;
+- сохраняет Linux payload per-device по `vendor` / `product` / `name`;
+- валидирует match устройств до применения изменений.
+
+Ограничения текущей версии:
+
+- backend завязан на KDE Plasma + Wayland + доступность KWin DBus service;
+- сопоставление устройств делается по `vendor` / `product` / `name`, без более сложной migration logic;
+- button remapping и более широкий набор Plasma input settings пока не покрыты.
 
 ### Принципы для backend'ов
 

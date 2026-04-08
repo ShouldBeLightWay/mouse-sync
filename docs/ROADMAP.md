@@ -24,7 +24,7 @@ Roadmap не гарантирует точные сроки. Это список
 
 - строгая validation layer;
 - automated tests;
-- Linux backend'ы;
+- `x11-cinnamon` backend;
 - backend abstraction layer;
 - cross-backend mapping.
 
@@ -61,7 +61,7 @@ Roadmap не гарантирует точные сроки. Это список
 
 ## Stage 2 - Linux KDE Wayland backend
 
-Статус: первый Linux backend.
+Статус: базовый backend реализован, расширение продолжается.
 
 ### Целевая среда
 
@@ -83,9 +83,21 @@ Roadmap не гарантирует точные сроки. Это список
 - libinput-related settings;
 - возможные DBus / Plasma integration points.
 
+### Что уже сделано
+
+- backend `kde-wayland` добавлен в CLI;
+- capture/apply реализованы через KWin DBus;
+- Linux payload умеет хранить pointer settings per-device.
+
+### Что ещё осталось по этому этапу
+
+- расширить покрытие Plasma-specific settings;
+- добавить tests на Linux profile parsing и invalid device matching;
+- документировать ограничения device matching и supported properties.
+
 ### Результат этапа
 
-Появляется backend `kde-wayland`, документированно работающий в одной конкретной пользовательской среде.
+У проекта уже есть первый рабочий Linux backend для одной конкретной среды, но его ещё нужно довести до более устойчивого и проверяемого состояния.
 
 ## Stage 3 - Linux X11 Cinnamon backend
 
@@ -181,6 +193,6 @@ JSON format становится более строгим и устойчивы
 1. validation before apply;
 2. Windows backend cleanup;
 3. tests for profile parsing and invalid input;
-4. design note for `kde-wayland` payload;
-5. prototype `kde-wayland` capture path;
+4. tests for `kde-wayland` device matching and invalid input;
+5. extend `kde-wayland` payload with additional relevant Plasma settings;
 6. separate design note for `x11-cinnamon`.

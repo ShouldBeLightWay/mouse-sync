@@ -2,6 +2,8 @@
 
 #ifdef _WIN32
 #include "windows_backend.hpp"
+#elif defined(__linux__)
+#include "kde_wayland_backend.hpp"
 #endif
 
 namespace mouse_sync
@@ -19,7 +21,7 @@ std::optional<std::string> backend_os(const std::string &backend_id)
     {
         return std::string{kLinuxOsId};
     }
-    if (backend_id == "kde-wayland" || backend_id == "x11-cinnamon")
+    if (backend_id == kKdeWaylandBackendId || backend_id == kX11CinnamonBackendId)
     {
         return std::string{kLinuxOsId};
     }
@@ -57,6 +59,11 @@ std::vector<std::string> available_backends()
     std::vector<std::string> backends;
 #ifdef _WIN32
     backends.emplace_back(kWindowsBackendId);
+#elif defined(__linux__)
+    if (linux::kde_wayland::is_supported_environment())
+    {
+        backends.emplace_back(kKdeWaylandBackendId);
+    }
 #endif
     return backends;
 }
@@ -187,6 +194,26 @@ MouseProfile capture_profile(const std::string &backend_id, const std::string &c
 #endif
     }
 
+    if (backend_id == kKdeWaylandBackendId)
+    {
+#ifdef __linux__
+        if (!linux::kde_wayland::is_supported_environment())
+        {
+            throw_backend_unavailable(backend_id);
+        }
+
+        MouseProfile profile;
+        profile.created_at = created_at;
+        profile.source_os = kLinuxOsId;
+        profile.source_backend = std::string{kKdeWaylandBackendId};
+        profile.linux = linux::kde_wayland::capture();
+        validate_profile(profile);
+        return profile;
+#else
+        throw_backend_unavailable(backend_id);
+#endif
+    }
+
     if (backend_id == kLinuxOsId)
     {
         throw_backend_not_implemented(backend_id);
@@ -211,6 +238,21 @@ void apply_profile(const std::string &backend_id, const MouseProfile &profile)
         {
             throw BackendError(kWindowsBackendId, ex.what(), static_cast<long>(ex.error_code));
         }
+#else
+        throw_backend_unavailable(backend_id);
+#endif
+    }
+
+    if (backend_id == kKdeWaylandBackendId)
+    {
+#ifdef __linux__
+        if (!linux::kde_wayland::is_supported_environment())
+        {
+            throw_backend_unavailable(backend_id);
+        }
+
+        linux::kde_wayland::apply(*profile.linux);
+        return;
 #else
         throw_backend_unavailable(backend_id);
 #endif
