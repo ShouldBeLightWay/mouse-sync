@@ -1,2 +1,160 @@
 # mouse-sync
-Tool for sync mouse settings between OS
+
+> Capture and apply mouse pointer settings between Windows and Linux — so your
+> dual-boot setup feels consistent without manual guessing.
+
+## Status
+
+| Feature | Status |
+|---|---|
+| Windows capture (speed, EPP, thresholds, registry) | ✅ Implemented |
+| Windows apply (SPI + registry + broadcast) | ✅ Implemented |
+| `print` command (cross-platform, reads JSON) | ✅ Implemented |
+| `schema` / `version` commands | ✅ Implemented |
+| Linux KDE/Wayland backend | 🔜 Planned (v0.2) |
+| Linux X11/Cinnamon backend | 🔜 Planned (v0.2) |
+| Calibration / auto-match | 🔜 Planned (v0.3) |
+| GUI | ❌ Non-goal for now |
+
+---
+
+## What it does
+
+`mouse-sync` is a CLI tool that:
+
+1. **Captures** all relevant mouse pointer settings from the current OS and
+   saves them to a JSON file.
+2. **Applies** settings from a JSON file to the current OS.
+3. Provides a shared JSON format with a `windows` section and a `linux`
+   placeholder, ready for future backends.
+
+### Captured Windows settings
+
+- **Mouse speed** – `SPI_GETMOUSESPEED` (1 = slowest … 20 = fastest; default 10).
+- **Enhance Pointer Precision (EPP)** – on/off flag from `SPI_GETMOUSE`.
+- **Acceleration thresholds** – `MouseThreshold1` and `MouseThreshold2` from
+  `SPI_GETMOUSE`.
+- **Registry snapshot** from `HKCU\Control Panel\Mouse`:
+  - `MouseSensitivity`, `MouseSpeed`, `MouseThreshold1`, `MouseThreshold2`
+  - `SmoothMouseXCurve` / `SmoothMouseYCurve` (EPP curve binary data, stored
+    as a hex string).
+
+### Apply behaviour
+
+When applying to Windows the tool:
+
+1. Calls `SPI_SETMOUSESPEED` and `SPI_SETMOUSE`.
+2. Writes the registry keys (if present in the JSON).
+3. Broadcasts `WM_SETTINGCHANGE` so running applications pick up the changes
+   immediately (no reboot needed).
+
+---
+
+## JSON format
+
+See [`examples/windows_example.json`](examples/windows_example.json) for a
+real-world sample.
+
+Run `mouse-sync schema` for a full field-by-field description.
+
+---
+
+## Building
+
+### Requirements
+
+| Tool | Version |
+|---|---|
+| CMake | ≥ 3.20 |
+| C++ compiler | MSVC 2019+ (Windows), GCC 10+ or Clang 12+ (Linux) |
+| Internet access | Required for first build (FetchContent pulls nlohmann/json & CLI11) |
+
+### Windows (MSVC / Visual Studio)
+
+```powershell
+# From the repository root
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+.\build\bin\Release\mouse-sync.exe version
+```
+
+Or open the folder in Visual Studio 2022 and use the built-in CMake support.
+
+### Linux (GCC / Ninja) — core + CLI only
+
+The Linux backend is not implemented yet; the build still succeeds and the
+`print`, `schema`, and `version` commands work cross-platform.
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/bin/mouse-sync version
+```
+
+---
+
+## Usage
+
+```
+mouse-sync <command> [options]
+
+Commands:
+  capture   --os windows --out <file>   Capture settings from the current OS
+  apply     --os windows --in  <file>   Apply settings to the current OS
+  print     --in <file>                 Pretty-print a JSON profile (any OS)
+  schema                                Show the JSON schema description
+  version                               Show version and available backends
+```
+
+### Examples
+
+```powershell
+# On Windows: save current settings
+mouse-sync capture --os windows --out my-mouse.json
+
+# On Windows: restore settings from a file
+mouse-sync apply --os windows --in my-mouse.json
+
+# On any OS: inspect a saved profile
+mouse-sync print --in my-mouse.json
+```
+
+---
+
+## Project layout
+
+```
+mouse-sync/
+├── cmake/            CMake helper scripts (FetchContent deps)
+├── core/             Header-only profile model + JSON serialization
+│   └── include/mouse_sync/profile.hpp
+├── backends/
+│   └── windows/      Windows SPI + registry backend (WIN32 only)
+├── cli/              CLI entry point (main.cpp)
+├── examples/         Sample JSON files
+└── .github/workflows CI (Windows MSVC + Ubuntu GCC)
+```
+
+---
+
+## Roadmap
+
+| Version | Goal |
+|---|---|
+| **0.1** (this PR) | Windows capture/apply, cross-platform CLI skeleton |
+| **0.2** | Linux KDE Wayland backend (`kwriteconfig6` / libinput) |
+| **0.2** | Linux X11 / Cinnamon backend (`xinput` properties) |
+| **0.3** | Calibration: measure px/cm and auto-match across OSes |
+
+---
+
+## Contributing
+
+Pull requests are welcome. To add a new backend, implement a header similar to
+`backends/windows/src/windows_backend.hpp` with `capture()` and `apply()`
+functions returning/accepting the relevant section of `MouseProfile`, then wire
+it up in `cli/main.cpp`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

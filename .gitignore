@@ -1,3 +1,21 @@
+# CMake build directories
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# FetchContent / vcpkg cache
+_deps/
+
+# IDEs
+.vs/
+.vscode/
+*.user
+*.suo
+.idea/
+
 # Prerequisites
 *.d
 
