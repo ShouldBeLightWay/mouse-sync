@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace mouse_sync
 {
@@ -15,6 +16,8 @@ inline constexpr int kSchemaVersion = 1;
 inline constexpr const char *kMouseSyncVersion = "0.1";
 inline constexpr const char *kWindowsBackendId = "windows";
 inline constexpr const char *kLinuxOsId = "linux";
+inline constexpr const char *kKdeWaylandBackendId = "kde-wayland";
+inline constexpr const char *kX11CinnamonBackendId = "x11-cinnamon";
 
 struct WindowsRegistrySnapshot
 {
@@ -36,11 +39,26 @@ struct WindowsSnapshot
     std::optional<WindowsRegistrySnapshot> registry;
 };
 
+struct LinuxPointerDeviceSnapshot
+{
+    std::string name;
+    int vendor{0};
+    int product{0};
+    std::optional<bool> left_handed;
+    std::optional<bool> middle_emulation;
+    std::optional<double> accel_speed;
+    std::optional<std::string> accel_profile;
+    std::optional<bool> natural_scroll;
+    std::optional<double> scroll_factor;
+    std::optional<bool> scroll_on_button_down;
+};
+
 struct LinuxSnapshot
 {
     std::optional<double> accel_speed;
     std::optional<std::string> accel_profile;
     std::optional<std::string> backend;
+    std::optional<std::vector<LinuxPointerDeviceSnapshot>> pointer_devices;
 };
 
 struct MouseProfile
@@ -111,7 +129,50 @@ inline bool is_hex_string(const std::string &value)
 
 inline bool has_linux_payload(const LinuxSnapshot &snapshot)
 {
-    return snapshot.accel_speed.has_value() || snapshot.accel_profile.has_value() || snapshot.backend.has_value();
+    return snapshot.accel_speed.has_value() || snapshot.accel_profile.has_value() || snapshot.backend.has_value() ||
+           (snapshot.pointer_devices.has_value() && !snapshot.pointer_devices->empty());
+}
+
+template <typename T> void require_optional_range(const std::optional<T> &value, T min_value, T max_value, const char *field)
+{
+    if (!value.has_value())
+    {
+        return;
+    }
+
+    if (*value < min_value || *value > max_value)
+    {
+        throw std::runtime_error(std::string(field) + " out of range [" + std::to_string(min_value) + ".." +
+                                 std::to_string(max_value) + "]");
+    }
+}
+
+inline void validate_linux_pointer_device_snapshot(const LinuxPointerDeviceSnapshot &snapshot)
+{
+    if (snapshot.name.empty())
+    {
+        throw std::runtime_error("linux pointer device name must not be empty");
+    }
+    if (snapshot.vendor < 0)
+    {
+        throw std::runtime_error("linux pointer device vendor must be >= 0");
+    }
+    if (snapshot.product < 0)
+    {
+        throw std::runtime_error("linux pointer device product must be >= 0");
+    }
+
+    require_optional_range(snapshot.accel_speed, -1.0, 1.0, "linux pointer device accel_speed");
+    require_optional_range(snapshot.scroll_factor, 0.0, 20.0, "linux pointer device scroll_factor");
+
+    if (snapshot.accel_profile.has_value())
+    {
+        const auto &value = *snapshot.accel_profile;
+        if (value != "adaptive" && value != "flat" && value != "custom")
+        {
+            throw std::runtime_error("linux pointer device accel_profile must be one of: adaptive, flat, custom");
+        }
+    }
 }
 
 inline void validate_windows_registry_snapshot(const WindowsRegistrySnapshot &snapshot)
@@ -184,14 +245,7 @@ inline void validate_windows_snapshot(const WindowsSnapshot &snapshot)
 
 inline void validate_linux_snapshot(const LinuxSnapshot &snapshot)
 {
-    if (snapshot.accel_speed.has_value())
-    {
-        const double value = *snapshot.accel_speed;
-        if (value < -1.0 || value > 1.0)
-        {
-            throw std::runtime_error("linux accel_speed out of range [-1.0..1.0]");
-        }
-    }
+    require_optional_range(snapshot.accel_speed, -1.0, 1.0, "linux accel_speed");
 
     if (snapshot.accel_profile.has_value())
     {
@@ -205,6 +259,19 @@ inline void validate_linux_snapshot(const LinuxSnapshot &snapshot)
     if (snapshot.backend.has_value() && snapshot.backend->empty())
     {
         throw std::runtime_error("linux backend must not be empty");
+    }
+
+    if (snapshot.pointer_devices.has_value())
+    {
+        if (snapshot.pointer_devices->empty())
+        {
+            throw std::runtime_error("linux pointer_devices must not be empty when present");
+        }
+
+        for (const auto &device : *snapshot.pointer_devices)
+        {
+            validate_linux_pointer_device_snapshot(device);
+        }
     }
 }
 
@@ -310,6 +377,7 @@ inline void to_json(nlohmann::json &j, const LinuxSnapshot &snapshot)
     detail::opt_to_json(j, "accel_speed", snapshot.accel_speed);
     detail::opt_to_json(j, "accel_profile", snapshot.accel_profile);
     detail::opt_to_json(j, "backend", snapshot.backend);
+    detail::opt_to_json(j, "pointer_devices", snapshot.pointer_devices);
 }
 
 inline void from_json(const nlohmann::json &j, LinuxSnapshot &snapshot)
@@ -317,6 +385,48 @@ inline void from_json(const nlohmann::json &j, LinuxSnapshot &snapshot)
     detail::opt_from_json(j, "accel_speed", snapshot.accel_speed);
     detail::opt_from_json(j, "accel_profile", snapshot.accel_profile);
     detail::opt_from_json(j, "backend", snapshot.backend);
+    detail::opt_from_json(j, "pointer_devices", snapshot.pointer_devices);
+}
+
+inline void to_json(nlohmann::json &j, const LinuxPointerDeviceSnapshot &snapshot)
+{
+    j = {
+        {"name", snapshot.name},
+        {"vendor", snapshot.vendor},
+        {"product", snapshot.product},
+    };
+
+    detail::opt_to_json(j, "left_handed", snapshot.left_handed);
+    detail::opt_to_json(j, "middle_emulation", snapshot.middle_emulation);
+    detail::opt_to_json(j, "accel_speed", snapshot.accel_speed);
+    detail::opt_to_json(j, "accel_profile", snapshot.accel_profile);
+    detail::opt_to_json(j, "natural_scroll", snapshot.natural_scroll);
+    detail::opt_to_json(j, "scroll_factor", snapshot.scroll_factor);
+    detail::opt_to_json(j, "scroll_on_button_down", snapshot.scroll_on_button_down);
+}
+
+inline void from_json(const nlohmann::json &j, LinuxPointerDeviceSnapshot &snapshot)
+{
+    if (j.contains("name"))
+    {
+        snapshot.name = j.at("name").get<std::string>();
+    }
+    if (j.contains("vendor"))
+    {
+        snapshot.vendor = j.at("vendor").get<int>();
+    }
+    if (j.contains("product"))
+    {
+        snapshot.product = j.at("product").get<int>();
+    }
+
+    detail::opt_from_json(j, "left_handed", snapshot.left_handed);
+    detail::opt_from_json(j, "middle_emulation", snapshot.middle_emulation);
+    detail::opt_from_json(j, "accel_speed", snapshot.accel_speed);
+    detail::opt_from_json(j, "accel_profile", snapshot.accel_profile);
+    detail::opt_from_json(j, "natural_scroll", snapshot.natural_scroll);
+    detail::opt_from_json(j, "scroll_factor", snapshot.scroll_factor);
+    detail::opt_from_json(j, "scroll_on_button_down", snapshot.scroll_on_button_down);
 }
 
 inline void to_json(nlohmann::json &j, const MouseProfile &profile)
@@ -406,6 +516,22 @@ inline void validate_profile(const MouseProfile &profile)
     {
         throw std::runtime_error("linux profile must not contain a windows payload");
     }
+
+    if (profile.source_backend.has_value())
+    {
+        if (profile.linux->backend.has_value() && *profile.linux->backend != *profile.source_backend)
+        {
+            throw std::runtime_error("linux payload backend must match source_backend");
+        }
+
+        if (*profile.source_backend == kKdeWaylandBackendId)
+        {
+            if (!profile.linux->pointer_devices.has_value() || profile.linux->pointer_devices->empty())
+            {
+                throw std::runtime_error("kde-wayland profile must contain at least one linux pointer device snapshot");
+            }
+        }
+    }
 }
 
 inline void validate_profile_for_apply(const MouseProfile &profile, const std::string &target_backend)
@@ -421,6 +547,32 @@ inline void validate_profile_for_apply(const MouseProfile &profile, const std::s
         if (profile.source_backend.has_value() && *profile.source_backend != kWindowsBackendId)
         {
             throw std::runtime_error("refusing to apply a profile captured by a different backend");
+        }
+        return;
+    }
+
+    if (target_backend == kKdeWaylandBackendId)
+    {
+        if (profile.source_os != kLinuxOsId)
+        {
+            throw std::runtime_error("refusing to apply a non-Linux profile using the kde-wayland backend");
+        }
+        if (!profile.source_backend.has_value() || *profile.source_backend != kKdeWaylandBackendId)
+        {
+            throw std::runtime_error("refusing to apply a profile captured by a different backend");
+        }
+        if (!profile.linux.has_value() || !profile.linux->pointer_devices.has_value() ||
+            profile.linux->pointer_devices->empty())
+        {
+            throw std::runtime_error("kde-wayland apply requires linux pointer_devices payload");
+        }
+
+        for (const auto &device : *profile.linux->pointer_devices)
+        {
+            if (device.accel_profile.has_value() && *device.accel_profile == "custom")
+            {
+                throw std::runtime_error("kde-wayland backend does not support accel_profile='custom'");
+            }
         }
         return;
     }
